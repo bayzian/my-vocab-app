@@ -8,6 +8,7 @@ import {
   Check,
   X,
   History,
+  Pencil,
 } from "lucide-react";
 
 const MODEL_URL =
@@ -37,7 +38,10 @@ export default function App() {
   const [showResult, setShowResult] = useState(false);
   const [score, setScore] = useState({ correct: 0, total: 0 });
   const [showHistory, setShowHistory] = useState(false);
+  const [editingItemId, setEditingItemId] = useState(null);
+  const [editedMeaning, setEditedMeaning] = useState("");
 
+  
   // 音声
   const [voices, setVoices] = useState([]);
   const [voice, setVoice] = useState(null);
@@ -172,6 +176,42 @@ export default function App() {
 
   function handleDelete(id) {
     setItems((prev) => prev.filter((x) => x.id !== id));
+    if (editingItemId === id) {
+      setEditingItemId(null);
+      setEditedMeaning("");
+    }
+  }
+
+  function startEditing(item) {
+    setEditingItemId(item.id);
+    setEditedMeaning(item.meaning);
+  }
+
+  function cancelEditing() {
+    setEditingItemId(null);
+    setEditedMeaning("");
+  }
+
+  function saveEditedMeaning() {
+    const trimmed = editedMeaning.trim();
+    if (!trimmed) {
+      alert("日本語訳を入力してください");
+      return;
+    }
+
+    setItems((prev) =>
+      prev.map((item) =>
+        item.id === editingItemId ? { ...item, meaning: trimmed } : item
+      )
+    );
+
+    setHistory((prev) =>
+      prev.map((entry) =>
+        entry.id === editingItemId ? { ...entry, meaning: trimmed } : entry
+      )
+    );
+
+    cancelEditing();
   }
 
   // テスト機能
@@ -331,9 +371,43 @@ export default function App() {
                         <Volume2 className="w-6 h-6" />
                       </button>
                     </div>
-                    <p className="text-base text-gray-600 break-words">
-                      {item.meaning}
-                    </p>
+                    <div className="text-base text-gray-600 break-words">
+                      {editingItemId === item.id ? (
+                        <div>
+                          <textarea
+                            value={editedMeaning}
+                            onChange={(e) => setEditedMeaning(e.target.value)}
+                            className="w-full mt-1 px-3 py-2 border-2 border-indigo-200 rounded-lg focus:outline-none focus:border-indigo-500 text-base"
+                            rows={3}
+                          />
+                          <div className="flex gap-2 mt-3">
+                            <button
+                              onClick={saveEditedMeaning}
+                              className="flex items-center gap-1 bg-green-600 text-white px-3 py-2 rounded-lg text-sm font-semibold hover:bg-green-700 active:bg-green-800 transition-colors"
+                            >
+                              <Check className="w-4 h-4" /> 保存
+                            </button>
+                            <button
+                              onClick={cancelEditing}
+                              className="flex items-center gap-1 bg-gray-200 text-gray-700 px-3 py-2 rounded-lg text-sm font-semibold hover:bg-gray-300 active:bg-gray-400 transition-colors"
+                            >
+                              <X className="w-4 h-4" /> キャンセル
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex items-start justify-between gap-2">
+                          <span className="flex-1 break-words">{item.meaning}</span>
+                          <button
+                            onClick={() => startEditing(item)}
+                            className="flex-shrink-0 text-indigo-500 hover:text-indigo-700 transition-colors p-1"
+                            aria-label="日本語訳を編集"
+                          >
+                            <Pencil className="w-4 h-4" />
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   </div>
 
                   <button
