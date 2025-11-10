@@ -1,153 +1,161 @@
-import React, { useEffect, useMemo, useState } from "react";
-import { Plus, Trash2, Wand2 } from "lucide-react";
-
-const GEMINI_ENDPOINT =
-  "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent";
+import React, { useState } from "react";
+import { Volume2, Trash2, Pencil, PlusCircle, Shuffle } from "lucide-react";
 
 export default function App() {
+  const [items, setItems] = useState([]);
   const [word, setWord] = useState("");
   const [meaning, setMeaning] = useState("");
   const [note, setNote] = useState("");
-  const [items, setItems] = useState(() => {
-    const saved = localStorage.getItem("vocab-items");
-    return saved ? JSON.parse(saved) : [];
-  });
-  const [loadingId, setLoadingId] = useState(null);
+  const [example, setExample] = useState("");
 
-  useEffect(() => {
-    localStorage.setItem("vocab-items", JSON.stringify(items));
-  }, [items]);
+  // 🔥 Gemini API（例文生成）
+  async function generateExample(w) {
+    const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+    if (!apiKey) return "(API key missing)";
 
-  const addItem = () => {
-    if (!word.trim()) return;
-    const newItem = {
-      id: crypto.randomUUID(),
-      word: word.trim(),
-      meaning: meaning.trim(),
-      note: note.trim(),
-      example: "",
-      createdAt: Date.now(),
-    };
-    setItems([newItem, ...items]);
+    const prompt = `英単語「${w}」を使って、自然な日本人向けの英語例文と日本語訳を生成して。出力は「英語文\n日本語訳」の形式。`;
+
+    try {
+      const res = await fetch(
+        "https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: { temperature: 0.7 },
+            apiKey,
+          }),
+        }
+      );
+
+      const data = await res.json();
+      return data?.candidates?.[0]?.content?.parts?.[0]?.text || "(no response)";
+    } catch (e) {
+      return "(error generating example)";
+    }
+  }
+
+  function handleAdd() {
+    if (!word || !meaning) return;
+    setItems([
+      ...items,
+      {
+        id: Date.now(),
+        word,
+        meaning,
+        note,
+        example: "",
+      },
+    ]);
     setWord("");
     setMeaning("");
     setNote("");
-  };
+  }
 
-  const removeItem = (id) => {
-    setItems(items.filter((x) => x.id !== id));
-  };
+  async function handleExample(id, w) {
+    const ex = await generateExample(w);
+    setItems((prev) =>
+      prev.map((item) =>
+        item.id === id ? { ...item, example: ex } : item
+      )
+    );
+  }
 
-  const askGeminiForExample = async (id, w) => {
-    const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
-    if (!apiKey) {
-      alert("VITE_GEMINI_API_KEY が設定されていません（VercelのEnvで設定）");
-      return;
-    }
-    try {
-      setLoadingId(id);
-      const prompt = `英単語「${w}」を使って、自然な英語の例文を1つ。中級レベル、15語以内。日本語訳も1行で。フォーマット: EN: ... / JA: ...`;
-      const res = await fetch(`${GEMINI_ENDPOINT}?key=${apiKey}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-        }),
-      });
-      const data = await res.json();
-      const text =
-        data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() ??
-        "(no response)";
-      setItems((prev) =>
-        prev.map((it) => (it.id === id ? { ...it, example: text } : it))
-      );
-    } catch (e) {
-      console.error(e);
-      alert("例文の生成に失敗しました");
-    } finally {
-      setLoadingId(null);
-    }
-  };
-
-  const count = useMemo(() => items.length, [items]);
+  function speak(text) {
+    const uttr = new SpeechSynthesisUtterance(text);
+    uttr.lang = "en-US";
+    speechSynthesis.speak(uttr);
+  }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-3xl mx-auto px-4 py-8">
-        <h1 className="text-2xl font-bold mb-6">英語メモ帳（my-vocab-app）</h1>
+    <div className="min-h-screen bg-gradient-to-b from-white to-[#e8efff] p-6">
+      <div className="max-w-2xl mx-auto space-y-6">
 
-        <div className="bg-white rounded-xl shadow p-4 mb-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            <input
-              className="border rounded-lg p-2"
-              placeholder="word（例: compelling）"
-              value={word}
-              onChange={(e) => setWord(e.target.value)}
-            />
-            <input
-              className="border rounded-lg p-2"
-              placeholder="meaning（例: 説得力のある）"
-              value={meaning}
-              onChange={(e) => setMeaning(e.target.value)}
-            />
-            <input
-              className="border rounded-lg p-2"
-              placeholder="note（例: 類義語: persuasive）"
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-            />
-          </div>
-          <button
-            onClick={addItem}
-            className="mt-3 inline-flex items-center gap-2 bg-black text-white px-4 py-2 rounded-lg"
-          >
-            <Plus size={18} />
-            追加
+        {/* ヘッダー */}
+        <div className="flex justify-between items-center">
+          <h1 className="text-2xl font-bold flex items-center gap-2">
+            📘 英語メモ帳
+          </h1>
+
+          <button className="flex items-center bg-green-500 text-white px-4 py-2 rounded-lg shadow hover:bg-green-600 transition text-sm">
+            <Shuffle size={16} /> テスト
           </button>
         </div>
 
-        <div className="text-sm text-gray-600 mb-2">合計 {count} 件</div>
+        {/* 入力欄 */}
+        <div className="bg-white p-4 rounded-xl shadow-md space-y-3">
+          <input
+            value={word}
+            onChange={(e) => setWord(e.target.value)}
+            placeholder="英単語・英文を入力"
+            className="w-full p-3 border rounded-lg"
+          />
+          <input
+            value={meaning}
+            onChange={(e) => setMeaning(e.target.value)}
+            placeholder="意味を入力"
+            className="w-full p-3 border rounded-lg"
+          />
+          <textarea
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            placeholder="メモ（任意）"
+            className="w-full p-3 border rounded-lg"
+          />
 
-        <div className="space-y-3">
-          {items.map((it) => (
-            <div key={it.id} className="bg-white rounded-xl shadow p-4">
-              <div className="flex items-start justify-between gap-4">
+          <button
+            onClick={handleAdd}
+            className="flex items-center bg-blue-600 text-white px-4 py-3 rounded-lg shadow hover:bg-blue-700 transition w-full justify-center"
+          >
+            <PlusCircle className="mr-2" /> 追加
+          </button>
+        </div>
+
+        {/* 単語カード一覧 */}
+        <div className="space-y-4">
+          {items.map((item) => (
+            <div
+              key={item.id}
+              className="bg-white p-5 rounded-xl shadow hover:shadow-lg transition border"
+            >
+              <div className="flex justify-between items-start">
                 <div>
-                  <div className="text-lg font-semibold">{it.word}</div>
-                  {it.meaning && (
-                    <div className="text-gray-700">意味: {it.meaning}</div>
+                  <h2 className="text-lg font-bold">{item.word}</h2>
+                  <p className="text-gray-600 mt-1">{item.meaning}</p>
+                  {item.note && (
+                    <p className="text-gray-500 mt-1 text-sm">✏️ {item.note}</p>
                   )}
-                  {it.note && (
-                    <div className="text-gray-500 text-sm mt-1">
-                      メモ: {it.note}
+
+                  {item.example && (
+                    <div className="bg-gray-100 p-3 rounded mt-3 text-sm whitespace-pre-line">
+                      {item.example}
                     </div>
                   )}
                 </div>
 
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => askGeminiForExample(it.id, it.word)}
-                    disabled={loadingId === it.id}
-                    className="inline-flex items-center gap-1 border px-3 py-1.5 rounded-lg"
-                  >
-                    <Wand2 size={16} />
-                    {loadingId === it.id ? "生成中…" : "例文"}
+                <div className="flex flex-col gap-3 ml-3">
+                  <button onClick={() => speak(item.word)}>
+                    <Volume2 className="text-blue-600 hover:text-blue-800" />
                   </button>
+
                   <button
-                    onClick={() => removeItem(it.id)}
-                    className="inline-flex items-center gap-1 border px-3 py-1.5 rounded-lg"
+                    onClick={() => handleExample(item.id, item.word)}
+                    className="text-gray-600 hover:text-gray-800"
                   >
-                    <Trash2 size={16} />
-                    削除
+                    <Pencil />
+                  </button>
+
+                  <button
+                    onClick={() =>
+                      setItems(items.filter((x) => x.id !== item.id))
+                    }
+                    className="text-red-500 hover:text-red-700"
+                  >
+                    <Trash2 />
                   </button>
                 </div>
               </div>
-
-              {it.example && (
-                <div className="mt-3 rounded-lg bg-gray-50 p-3 text-sm whitespace-pre-wrap">
-                  {it.example}
-                </div>
-              )}
             </div>
           ))}
         </div>
