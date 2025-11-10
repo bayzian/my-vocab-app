@@ -1,5 +1,14 @@
 import React, { useEffect, useState } from "react";
-import { Volume2, Trash2, PlusCircle, Shuffle, List, Check, X } from "lucide-react";
+import {
+  Volume2,
+  Trash2,
+  PlusCircle,
+  Shuffle,
+  List,
+  Check,
+  X,
+  History,
+} from "lucide-react";
 
 const MODEL_URL =
   "https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash:generateContent";
@@ -14,6 +23,7 @@ const preferredVoiceNames = [
 
 export default function App() {
   const [items, setItems] = useState([]);
+  const [history, setHistory] = useState([]);
   const [word, setWord] = useState("");
   const [isTranslating, setIsTranslating] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
@@ -26,6 +36,7 @@ export default function App() {
   const [selectedAnswer, setSelectedAnswer] = useState(null);
   const [showResult, setShowResult] = useState(false);
   const [score, setScore] = useState({ correct: 0, total: 0 });
+  const [showHistory, setShowHistory] = useState(false);
 
   // 音声
   const [voices, setVoices] = useState([]);
@@ -41,14 +52,25 @@ export default function App() {
         console.error("Failed to load items:", e);
       }
     }
+
+    const savedHistory = localStorage.getItem("vocabHistory");
+    if (savedHistory) {
+      try {
+        setHistory(JSON.parse(savedHistory));
+      } catch (e) {
+        console.error("Failed to load history:", e);
+      }
+    }
   }, []);
 
   // ローカルストレージに保存
   useEffect(() => {
-    if (items.length > 0) {
-      localStorage.setItem("vocabItems", JSON.stringify(items));
-    }
+    localStorage.setItem("vocabItems", JSON.stringify(items));
   }, [items]);
+
+  useEffect(() => {
+    localStorage.setItem("vocabHistory", JSON.stringify(history));
+  }, [history]);
 
   useEffect(() => {
     function loadVoices() {
@@ -135,15 +157,15 @@ export default function App() {
     setIsTranslating(false);
 
     if (translation) {
-      setItems((prev) => [
-        {
-          id: Date.now(),
-          word: word.trim(),
-          meaning: translation,
-          timestamp: Date.now(),
-        },
-        ...prev,
-      ]);
+      const entry = {
+        id: Date.now(),
+        word: word.trim(),
+        meaning: translation,
+        timestamp: Date.now(),
+      };
+
+      setItems((prev) => [entry, ...prev]);
+      setHistory((prev) => [entry, ...prev]);
       setWord("");
     }
   }
@@ -238,6 +260,16 @@ export default function App() {
               一覧へ
             </button>
           )}
+
+          {mode === "list" && (
+            <button
+              onClick={() => setShowHistory((prev) => !prev)}
+              className="bg-white border-2 border-indigo-100 text-indigo-600 px-4 py-2 rounded-lg font-semibold hover:border-indigo-300 active:border-indigo-400 transition-colors flex items-center gap-2"
+            >
+              <History className="w-5 h-5" />
+              {showHistory ? "履歴を閉じる" : "履歴を見る"}
+            </button>
+          )}
         </div>
 
         {/* 入力エリア - リストモードのみ */}
@@ -273,7 +305,7 @@ export default function App() {
       {/* コンテンツエリア */}
       {mode === "list" ? (
         // 単語リスト
-        <div className="px-4 py-4 pb-20 space-y-3">
+        <div className="px-4 py-4 pb-32 space-y-6">
           {items.length === 0 ? (
             <div className="bg-white rounded-xl shadow p-8 text-center text-gray-400 mt-8">
               <p className="text-base">まだ単語が登録されていません</p>
@@ -314,6 +346,50 @@ export default function App() {
                 </div>
               </div>
             ))
+          )}
+          
+          {showHistory && (
+            <div className="bg-white rounded-xl shadow-lg p-6 space-y-4">
+              <div className="flex items-center justify-between">
+                <h2 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
+                  <History className="w-5 h-5" /> 登録履歴
+                </h2>
+                <p className="text-sm text-gray-500">
+                  {history.length} 件
+                </p>
+              </div>
+
+              {history.length === 0 ? (
+                <p className="text-sm text-gray-500">まだ履歴がありません。</p>
+              ) : (
+                <ul className="space-y-3 max-h-80 overflow-y-auto pr-1">
+                  {history.map((entry) => (
+                    <li key={entry.id} className="border border-gray-200 rounded-lg p-3">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm text-gray-500">
+                            {new Date(entry.timestamp).toLocaleString()}
+                          </p>
+                          <p className="text-lg font-semibold text-gray-800 break-words">
+                            {entry.word}
+                          </p>
+                          <p className="text-base text-gray-600 break-words">
+                            {entry.meaning}
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => speak(entry.word)}
+                          className="flex-shrink-0 text-indigo-600 hover:text-indigo-800 transition-colors p-1"
+                          aria-label="履歴の発音を聞く"
+                        >
+                          <Volume2 className="w-5 h-5" />
+                        </button>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
           )}
         </div>
       ) : (
