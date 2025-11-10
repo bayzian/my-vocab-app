@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { Volume2, Trash2, PlusCircle, Shuffle, List, Check, X } from "lucide-react";
 
 const MODEL_URL =
-  "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent";
+  "https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash:generateContent";
 
 const preferredVoiceNames = [
   "Google UK English Male",
