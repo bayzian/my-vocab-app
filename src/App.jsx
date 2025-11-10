@@ -67,10 +67,6 @@ export default function App() {
   const [showHistory, setShowHistory] = useState(false);
   const [editingItemId, setEditingItemId] = useState(null);
   const [editedMeaning, setEditedMeaning] = useState("");
-
-  const [editingItemId, setEditingItemId] = useState(null);
-  const [editedMeaning, setEditedMeaning] = useState("");
-
   
   // 音声
   const [voices, setVoices] = useState([]);
