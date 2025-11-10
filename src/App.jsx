@@ -22,6 +22,33 @@ const preferredVoiceNames = [
   "Microsoft David",
 ];
 
+function normalizeTranslation(rawText) {
+  if (!rawText) return "";
+
+  const withoutAgents = rawText
+    .replace(/^THINK:.*$/gim, "")
+    .replace(/^ACTION:.*$/gim, "")
+    .replace(/^OBSERVATION:.*$/gim, "")
+    .replace(/^FINAL ANSWER:?/gim, "")
+    .replace(/```(?:[a-z]*)?|\*\*/g, "")
+    .trim();
+
+  if (!withoutAgents) return "";
+
+  const jpMatches = withoutAgents.match(/[一-龥ぁ-んァ-ンー〜][一-龥ぁ-んァ-ンー〜・／（）()、。！？…ー〜]*/g);
+  if (jpMatches && jpMatches.length > 0) {
+    return jpMatches[jpMatches.length - 1].trim();
+  }
+
+  const fallbackLines = withoutAgents
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  return fallbackLines[fallbackLines.length - 1] || "";
+}
+
+
 export default function App() {
   const [items, setItems] = useState([]);
   const [history, setHistory] = useState([]);
@@ -38,6 +65,9 @@ export default function App() {
   const [showResult, setShowResult] = useState(false);
   const [score, setScore] = useState({ correct: 0, total: 0 });
   const [showHistory, setShowHistory] = useState(false);
+  const [editingItemId, setEditingItemId] = useState(null);
+  const [editedMeaning, setEditedMeaning] = useState("");
+
   const [editingItemId, setEditingItemId] = useState(null);
   const [editedMeaning, setEditedMeaning] = useState("");
 
@@ -135,15 +165,16 @@ export default function App() {
       }
 
       const data = await res.json();
-      const text = data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || "";
+      const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
+      const translation = normalizeTranslation(text);
 
-      if (!text) {
+      if (!translation) {
         setErrorMessage("翻訳結果を取得できませんでした。もう一度お試しください。");
         return "";
       }
 
       setErrorMessage("");
-      return text;
+      return translation;
     } catch (e) {
       console.error("Translation error:", e);
       setErrorMessage(
