@@ -16,6 +16,7 @@ export default function App() {
   const [items, setItems] = useState([]);
   const [word, setWord] = useState("");
   const [isTranslating, setIsTranslating] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
   
   // テストモード
   const [mode, setMode] = useState("list"); // "list" or "test"
@@ -77,7 +78,9 @@ export default function App() {
   async function translateWord(targetWord) {
     const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
     if (!apiKey) {
-      alert("APIキーが設定されていません。環境変数 VITE_GEMINI_API_KEY を確認してください。");
+      setErrorMessage(
+        "APIキーが設定されていません。環境変数 VITE_GEMINI_API_KEY を確認してください。"
+      );
       return "";
     }
 
@@ -93,16 +96,33 @@ export default function App() {
       });
 
       if (!res.ok) {
-        throw new Error(`API Error: ${res.status}`);
+        let apiMessage = "";
+        try {
+          const errorBody = await res.json();
+          apiMessage = errorBody?.error?.message
+            ? `: ${errorBody.error.message}`
+            : "";
+        } catch (parseError) {
+          console.error("Failed to parse API error response:", parseError);
+        }
+        throw new Error(`API Error ${res.status}${apiMessage}`);
       }
 
       const data = await res.json();
       const text = data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || "";
-      
-      return text || "翻訳に失敗しました";
+
+      if (!text) {
+        setErrorMessage("翻訳結果を取得できませんでした。もう一度お試しください。");
+        return "";
+      }
+
+      setErrorMessage("");
+      return text;
     } catch (e) {
       console.error("Translation error:", e);
-      alert("翻訳に失敗しました。APIキーとネットワーク接続を確認してください。");
+      setErrorMessage(
+        `翻訳に失敗しました。設定したAPIキーが正しいか、ネットワーク状況を確認してください。（詳細: ${e.message}）`
+      );
       return "";
     }
   }
@@ -196,9 +216,7 @@ export default function App() {
       {/* ヘッダー */}
       <div className="sticky top-0 z-10 bg-white shadow-md">
         <div className="px-4 py-3 flex items-center justify-between">
-          <h1 className="text-xl font-bold flex items-center gap-2">
-            📘 英語メモ帳
-          </h1>
+          <h1 className="text-xl font-bold flex items-center gap-2">📘 英語メモ帳</h1>
 
           {mode === "list" && (
             <button
@@ -243,6 +261,11 @@ export default function App() {
                 {isTranslating ? "..." : <PlusCircle className="w-6 h-6" />}
               </button>
             </div>
+            {errorMessage && (
+              <p className="mt-3 text-sm text-red-600 bg-red-50 border border-red-100 rounded-md px-3 py-2">
+                {errorMessage}
+              </p>
+            )}
           </div>
         )}
       </div>
